@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Mission: Bday Recovery</title>
+    
+    <!-- 1. Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    screens: {
+                        'xs': '375px',
+                        'short': { 'raw': '(max-height: 660px)' }
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- 2. Load React and ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    
+    <!-- 3. Load Babel -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Custom Animations -->
+    <style>
+        /* Force full height and disable overscroll bounce on mobile */
+        body, html { 
+            height: 100%; 
+            margin: 0; 
+            padding: 0; 
+            overflow: hidden; 
+            background-color: #000; 
+            overscroll-behavior-y: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        #root {
+            height: 100%;
+            width: 100%;
+        }
+
+        @keyframes twinkle {
+          0% { opacity: 0; transform: scale(0); }
+          50% { opacity: 1; transform: scale(1); }
+          100% { opacity: 0; transform: scale(0); }
+        }
+        @keyframes float {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-20px); }
+        }
+        @keyframes shake {
+          10%, 90% { transform: translate3d(-2px, 0, 0) rotate(2deg); }
+          20%, 80% { transform: translate3d(2px, 0, 0) rotate(-2deg); }
+          30%, 50%, 70% { transform: translate3d(-4px, 0, 0) rotate(4deg); }
+          40%, 60% { transform: translate3d(4px, 0, 0) rotate(-4deg); }
+        }
+        @keyframes jetpack {
+          from { height: 60px; opacity: 0.8; }
+          to { height: 80px; opacity: 1; }
+        }
+        @keyframes wave {
+          0%, 100% { transform: rotate(-140deg); }
+          50% { transform: rotate(-120deg); }
+        }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        
+        .animate-twinkle { animation: twinkle linear infinite; }
+        .animate-float { animation: float 3s ease-in-out infinite; }
+        .animate-shake { animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) infinite; }
+        .animate-jetpack { animation: jetpack 0.2s ease-in-out infinite alternate; }
+        .animate-wave { animation: wave 1s ease-in-out infinite; }
+        .animate-spin-slow { animation: spin 3s linear infinite; }
+        
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        /* Smooth scrolling for iOS */
+        .smooth-scroll {
+            -webkit-overflow-scrolling: touch;
+        }
+    </style>
+</head>
+<body class="bg-black text-white">
+    <div id="root">
+        <!-- Fallback loading state -->
+        <div class="h-full w-full flex items-center justify-center text-emerald-500 font-mono animate-pulse">
+            Loading Mission Control...
+        </div>
+    </div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // --- ICONS ---
+        const Rocket = ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></svg>;
+        const Clock = ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>;
+        const RotateCcw = ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>;
+        const AlertTriangle = ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>;
+        const PartyPopper = ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M5.8 11.3 2 22l10.7-3.79"/><path d="M4 3h.01"/><path d="M22 8h.01"/><path d="M15 2h.01"/><path d="M22 20h.01"/><path d="m22 2-2.24.75a2.9 2.9 0 0 0-1.96 3.12v.11c.1.7.57 1.29 1.25 1.58L22 8.3c1.24.52 1.63 2.1.84 3.12l-.99 1.28a2.9 2.9 0 0 0-.6 3.11l.16.48c.32.96-.54 1.94-1.55 1.77l-1.3-.2a2.9 2.9 0 0 0-3.13 1.39l-.42 1.05c-.4 1.01-1.78 1.14-2.36.23l-.86-1.36a2.9 2.9 0 0 0-3.08-1.2l-1.3.4c-1.03.32-2.02-.54-1.78-1.55l.2-1.3a2.9 2.9 0 0 0-1.2-3.08l-1.27-.85c-.92-.61-.75-2.01.29-2.4l1.24-.46a2.9 2.9 0 0 0 1.83-2.93l-.12-.86C4.85 4.34 5.92 3.5 6.8 4l1.08.62a2.9 2.9 0 0 0 3.03-.23l.97-.67c.92-.64 2.21-.24 2.6.82l.33.89a2.9 2.9 0 0 0 2.66 1.93h.09c1.07 0 1.96-.82 2.06-1.89l.06-.52C19.79 3.09 21.36 2.5 22 2z"/></svg>;
+        const Globe = ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>;
+
+        const App = () => {
+            // === CONFIGURATION ===
+            const faceImage = "https://i.imgur.com/hCgts59.png";
+            const facePosition = { x: 50, y: 35, scale: 1.4 };
+
+            const [scrollProgress, setScrollProgress] = useState(0);
+            const scrollContainerRef = useRef(null);
+
+            useEffect(() => {
+                const handleScroll = () => {
+                    if (!scrollContainerRef.current) return;
+                    const { scrollTop, scrollHeight, clientHeight } = scrollContainerRef.current;
+                    const maxScroll = scrollHeight - clientHeight;
+                    if (maxScroll <= 0) return;
+                    
+                    const progress = Math.min(Math.max(scrollTop / maxScroll, 0), 1);
+                    setScrollProgress(progress);
+                };
+                const container = scrollContainerRef.current;
+                if (container) {
+                    container.addEventListener('scroll', handleScroll);
+                    // Initial check
+                    handleScroll();
+                    return () => container.removeEventListener('scroll', handleScroll);
+                }
+            }, []);
+
+            const handleReplay = () => {
+                if (scrollContainerRef.current) {
+                    scrollContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+                }
+            };
+
+            const getMissionPhase = () => {
+                if (scrollProgress < 0.2) return 'launch';
+                if (scrollProgress < 0.5) return 'turbulence';
+                if (scrollProgress < 0.8) return 'warp';
+                return 'arrival';
+            };
+
+            const phase = getMissionPhase();
+
+            // Dynamic styles to handle mobile viewport height properly
+            const fullHeightStyle = { 
+                height: '100vh', /* Fallback for older browsers */
+                height: '100dvh' 
+            };
+
+            return (
+                <div style={fullHeightStyle} className="relative w-full font-mono overflow-hidden bg-black text-white">
+                    
+                    {/* 1. BACKGROUND LAYERS (Z-0) */}
+                    <div className="absolute inset-0 z-0 overflow-hidden">
+                        {/* Starfield */}
+                        <div className={`absolute inset-0 transition-opacity duration-1000 ${phase === 'arrival' ? 'opacity-20' : 'opacity-100'}`}>
+                             {[...Array(40)].map((_, i) => (
+                               <div key={i} className="absolute bg-white rounded-full animate-twinkle" style={{
+                                 left: `${Math.random() * 100}%`,
+                                 top: `${Math.random() * 100}%`,
+                                 width: `${Math.random() * 2 + 1}px`,
+                                 height: `${Math.random() * 2 + 1}px`,
+                                 animationDuration: `${Math.random() * 3 + 1}s`,
+                                 transform: `translateZ(${scrollProgress * 500}px)` 
+                               }} />
+                             ))}
+                        </div>
+                        {/* Warp Tunnel */}
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-50">
+                             {[...Array(5)].map((_, i) => (
+                                <div key={`warp-${i}`} 
+                                  className="absolute rounded-full border border-indigo-500/30"
+                                  style={{
+                                    width: '100vw',
+                                    height: '100vw',
+                                    transform: `scale(${ (scrollProgress * 5 + (i * 0.2)) % 5 })`,
+                                    opacity: 1 - ((scrollProgress * 5 + (i * 0.2)) % 5) / 5,
+                                    transition: 'transform 0.1s linear'
+                                  }}
+                                />
+                             ))}
+                        </div>
+                    </div>
+
+                    {/* 2. HUD (Z-50) */}
+                    <div className="absolute inset-0 z-50 pointer-events-none p-4 flex flex-col justify-between safe-area-padding">
+                        <div className="flex justify-between items-start text-emerald-400 text-xs md:text-sm tracking-widest uppercase">
+                          <div>
+                             <p>MISSION: BDAY_RECOVERY</p>
+                             <p className="hidden xs:block">VECTOR: USA <span className="text-yellow-400 animate-pulse">➜</span> INDIA</p>
+                             <p className="xs:hidden">USA <span className="text-yellow-400">➜</span> IND</p>
+                             <p className="text-[10px] text-slate-500">LAG_COMPENSATION: ACTIVE</p>
+                          </div>
+                          <div className="text-right">
+                             <p>DRIFT: {Math.floor(scrollProgress * 100)}%</p>
+                             <p className={`font-bold ${phase === 'turbulence' ? 'text-red-500 animate-pulse' : 'text-emerald-400'}`}>
+                               STATUS: {phase.toUpperCase()}
+                             </p>
+                          </div>
+                        </div>
+                        
+                        <div className="w-full bg-slate-900/50 backdrop-blur border-t border-emerald-500/30 p-2 pb-[env(safe-area-inset-bottom)]">
+                            <div className="h-1 bg-slate-800 rounded-full overflow-hidden">
+                                <div 
+                                  className="h-full bg-emerald-500 transition-all duration-100" 
+                                  style={{ width: `${scrollProgress * 100}%` }}
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 3. CHRONONAUT (Z-10) */}
+                    <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none pb-20 md:pb-0">
+                        <div className={`relative w-64 h-80 md:w-80 md:h-96 transition-transform duration-500 ease-out
+                          ${phase === 'launch' ? 'translate-y-0 scale-100' : ''}
+                          ${phase === 'turbulence' ? 'translate-y-0 scale-110 translate-x-2 rotate-3' : ''}
+                          ${phase === 'warp' ? 'scale-90 translate-y-[-20px] blur-[1px]' : ''}
+                          ${phase === 'arrival' ? 'scale-110 translate-y-[-40px]' : ''}
+                        `}>
+                          
+                          <div className={`relative w-full h-full ${phase === 'turbulence' ? 'animate-shake' : 'animate-float'}`}>
+                            
+                            {/* Helmet */}
+                            <div className="absolute top-8 md:top-10 left-1/2 -translate-x-1/2 w-32 h-36 md:w-40 md:h-44 z-20">
+                              <div className="absolute inset-0 rounded-full border-4 border-slate-300 bg-slate-800 overflow-hidden shadow-2xl z-20">
+                                 <div 
+                                    className="w-full h-full bg-slate-600"
+                                    style={{
+                                      backgroundImage: `url(${faceImage})`,
+                                      backgroundPosition: `${facePosition.x}% ${facePosition.y}%`,
+                                      backgroundSize: `${facePosition.scale * 100}%`,
+                                      backgroundRepeat: 'no-repeat',
+                                      filter: phase === 'turbulence' ? 'sepia(50%) hue-rotate(-50deg)' : 'none'
+                                    }}
+                                 />
+                                 <div className="absolute top-4 right-4 w-8 h-4 bg-white/20 rounded-full rotate-[-45deg] blur-sm"></div>
+                              </div>
+                              <div className="absolute -top-6 left-2 w-1 h-10 bg-slate-400 -rotate-12"></div>
+                              <div className="absolute -top-6 right-2 w-1 h-10 bg-slate-400 rotate-12"></div>
+                              <div className="absolute -top-8 left-1 w-3 h-3 bg-red-500 rounded-full animate-ping"></div>
+                            </div>
+
+                            {/* Suit Body */}
+                            <div className="absolute top-40 md:top-48 left-1/2 -translate-x-1/2 w-40 h-48 md:w-48 md:h-56 z-10">
+                               <svg viewBox="0 0 200 200" className="w-full h-full drop-shadow-lg">
+                                 <path d="M40,0 L160,0 L180,160 L140,190 L60,190 L20,160 Z" fill="#E2E8F0" />
+                                 <rect x="60" y="40" width="80" height="60" rx="10" fill="#334155" />
+                                 <circle cx="80" cy="70" r="10" fill="#10B981" className={phase === 'turbulence' ? 'animate-pulse' : ''} />
+                                 <circle cx="120" cy="70" r="10" fill="#F43F5E" className={phase === 'turbulence' ? 'animate-pulse' : ''} />
+                                 <circle cx="30" cy="20" r="35" fill="#94A3B8" />
+                                 <circle cx="170" cy="20" r="35" fill="#94A3B8" />
+                               </svg>
+                            </div>
+
+                            {/* Arms */}
+                            <div className={`absolute top-40 md:top-48 -left-2 md:-left-4 w-12 md:w-16 h-32 md:h-40 origin-top-right transition-all duration-500
+                                ${phase === 'launch' ? 'rotate-12' : ''}
+                                ${phase === 'turbulence' ? '-rotate-[30deg] -translate-y-4' : ''}
+                                ${phase === 'warp' ? 'rotate-[160deg]' : ''}
+                                ${phase === 'arrival' ? '-rotate-[140deg] animate-wave' : ''}
+                            `}>
+                                <div className="w-10 md:w-12 h-28 md:h-32 bg-slate-300 rounded-full border-4 border-slate-400"></div>
+                                <div className="absolute bottom-0 w-14 md:w-16 h-14 md:h-16 bg-slate-400 rounded-full -left-2"></div>
+                            </div>
+
+                            <div className={`absolute top-40 md:top-48 -right-2 md:-right-4 w-12 md:w-16 h-32 md:h-40 origin-top-left transition-all duration-500
+                                ${phase === 'launch' ? '-rotate-12' : ''}
+                                ${phase === 'turbulence' ? 'rotate-[30deg] -translate-y-4' : ''}
+                                ${phase === 'warp' ? '-rotate-[160deg]' : ''}
+                                ${phase === 'arrival' ? 'rotate-[140deg]' : ''}
+                            `}>
+                                <div className="w-10 md:w-12 h-28 md:h-32 bg-slate-300 rounded-full border-4 border-slate-400"></div>
+                                <div className="absolute bottom-0 w-14 md:w-16 h-14 md:h-16 bg-slate-400 rounded-full -left-2"></div>
+                            </div>
+
+                            {/* Jetpack Flames */}
+                            {phase !== 'arrival' && (
+                              <div className="absolute bottom-[-10px] md:bottom-[-20px] left-1/2 -translate-x-1/2 flex gap-4">
+                                 <div className={`w-6 md:w-8 h-20 md:h-24 bg-gradient-to-b from-orange-400 to-transparent rounded-full blur-md animate-jetpack`}></div>
+                                 <div className={`w-6 md:w-8 h-20 md:h-24 bg-gradient-to-b from-orange-400 to-transparent rounded-full blur-md animate-jetpack`}></div>
+                              </div>
+                            )}
+                            
+                            {/* Party Popper */}
+                            {phase === 'arrival' && (
+                               <div className="absolute -top-10 left-1/2 -translate-x-1/2 w-full text-center animate-bounce">
+                                  <PartyPopper className="w-12 h-12 md:w-16 md:h-16 text-yellow-400 mx-auto" />
+                               </div>
+                            )}
+
+                          </div>
+                        </div>
+                    </div>
+
+                    {/* 4. SCROLL CONTAINER (Z-30) */}
+                    <div ref={scrollContainerRef} className="absolute inset-0 overflow-y-auto snap-y snap-mandatory scroll-smooth z-30 no-scrollbar smooth-scroll">
+                        
+                        {/* SECTION 1: LAUNCH */}
+                        <section style={fullHeightStyle} className="w-full flex items-end justify-center snap-center pb-[15vh] px-6">
+                          <div className="bg-black/80 backdrop-blur-md border border-emerald-500/50 p-6 rounded-2xl max-w-sm w-full text-center shadow-[0_0_30px_rgba(16,185,129,0.2)] mb-[env(safe-area-inset-bottom)]">
+                            <h1 className="text-2xl md:text-3xl font-black text-emerald-400 mb-2">INITIATING LAUNCH</h1>
+                            <p className="text-sm md:text-base text-slate-300 mb-4">
+                              I tried to send this wish on time... really, I did.
+                            </p>
+                            <div className="flex items-center justify-center gap-2 text-xs text-emerald-600 font-mono animate-bounce">
+                               <Rocket className="w-4 h-4" /> 
+                               <span>SCROLL TO START</span>
+                            </div>
+                          </div>
+                        </section>
+
+                        {/* SECTION 2: ERROR */}
+                        <section style={fullHeightStyle} className="w-full flex items-end justify-center snap-center pb-[15vh] px-6">
+                           <div className="bg-black/80 backdrop-blur-md border border-red-500/50 p-6 rounded-2xl max-w-sm w-full text-center shadow-[0_0_30px_rgba(239,68,68,0.2)] mb-[env(safe-area-inset-bottom)]">
+                            <h2 className="text-xl md:text-2xl font-bold text-red-500 mb-2 flex items-center justify-center gap-2">
+                               <AlertTriangle className="w-5 h-5 md:w-6 md:h-6" /> CRITICAL DELAY
+                            </h2>
+                            <p className="text-sm md:text-base text-slate-300">
+                               I got caught in a <strong>Procrastination Nebula</strong>!
+                              <br/><br/>
+                              <span className="text-xs md:text-sm opacity-80 flex items-center justify-center gap-2">
+                                 <Globe className="w-3 h-3 md:w-4 md:h-4" />
+                                 USA vs India Latency:
+                              </span>
+                              <span className="text-xs italic text-slate-400 block mt-1">
+                                 "I tried to calculate the time difference, but I missed that window too!"
+                              </span>
+                            </p>
+                          </div>
+                        </section>
+
+                        {/* SECTION 3: WARP */}
+                        <section style={fullHeightStyle} className="w-full flex items-end justify-center snap-center pb-[15vh] px-6">
+                           <div className="bg-black/80 backdrop-blur-md border border-indigo-500/50 p-6 rounded-2xl max-w-sm w-full text-center shadow-[0_0_30px_rgba(99,102,241,0.2)] mb-[env(safe-area-inset-bottom)]">
+                            <h2 className="text-xl md:text-2xl font-bold text-indigo-400 mb-2">ENGAGING WARP</h2>
+                            <p className="text-sm md:text-base text-slate-300">
+                              Rerouting power from "Excuses" to "Sincere Apologies"...
+                              <br/>
+                              <span className="text-xs opacity-60 block mt-2">Accelerating through the International Date Line...</span>
+                            </p>
+                            <div className="mt-4 flex justify-center">
+                               <Clock className="w-6 h-6 md:w-8 md:h-8 text-indigo-400 animate-spin-slow" />
+                            </div>
+                          </div>
+                        </section>
+
+                        {/* SECTION 4: ARRIVAL */}
+                        <section style={fullHeightStyle} className="w-full flex items-center justify-center snap-center px-6">
+                           <div className="bg-white/10 backdrop-blur-md border border-yellow-400 p-8 rounded-2xl max-w-sm w-full text-center shadow-[0_0_50px_rgba(250,204,21,0.4)] transform scale-100 md:scale-110">
+                            <h1 className="text-3xl md:text-4xl font-black text-yellow-400 mb-4 drop-shadow-md">
+                              MISSION SUCCESS!
+                            </h1>
+                            <p className="text-lg md:text-xl font-bold text-white mb-6">
+                              HAPPY BELATED BIRTHDAY!
+                            </p>
+                            <p className="text-xs md:text-sm text-slate-300 mb-8">
+                              (It arrived late because it traveled across the world... and then some.)
+                            </p>
+                            
+                            <button 
+                                onClick={handleReplay}
+                                className="bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-3 rounded-full font-bold flex items-center justify-center gap-2 mx-auto transition-all active:scale-95 touch-manipulation w-full md:w-auto"
+                            >
+                                <RotateCcw className="w-4 h-4" /> REPLAY MISSION
+                            </button>
+                          </div>
+                        </section>
+
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
